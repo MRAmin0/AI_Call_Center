@@ -1,11 +1,10 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, render_template
 from transformers import pipeline
 from flask_cors import CORS
 import webbrowser
 import threading
-import os
 
-app = Flask(__name__, static_folder='static')  # تعریف فولدر static برای فایل‌های استاتیک مثل HTML
+app = Flask(__name__)  # از Flask بدون نیاز به static_folder استفاده می‌کنیم
 CORS(app)  # برای دسترسی به API از مرورگرهای مختلف
 
 # لود مدل تحلیل احساسات (مدل فارسی)
@@ -22,7 +21,7 @@ faq = {
 @app.route("/")
 def home():
     """صفحه اصلی که پیام خوش‌آمدگویی نمایش می‌دهد"""
-    return send_from_directory(os.path.join(app.root_path, 'static'), 'index.html')
+    return render_template('index.html')  # استفاده از render_template برای بارگذاری فایل HTML از پوشه templates
 
 @app.route("/chat", methods=["POST"])
 def chat():
