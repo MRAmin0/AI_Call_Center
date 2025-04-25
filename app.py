@@ -1,49 +1,52 @@
 from flask import Flask, request, jsonify, render_template
-from transformers import AutoTokenizer, AutoModelWithLMHead, pipeline
+from transformers import pipeline
 from flask_cors import CORS
-import torch
-import threading
 import webbrowser
+import threading
 
-app = Flask(__name__)
-CORS(app)
+app = Flask(__name__)  # از Flask بدون نیاز به static_folder استفاده می‌کنیم
+CORS(app)  # برای دسترسی به API از مرورگرهای مختلف
 
-# بارگذاری مدل GPT2 بهینه‌شده فارسی (روی CPU)
-tokenizer = AutoTokenizer.from_pretrained("SajjadAyoubi/distilgpt2-fa")
-model = AutoModelWithLMHead.from_pretrained("SajjadAyoubi/distilgpt2-fa")
-generator = pipeline("text-generation", model=model, tokenizer=tokenizer, device=-1)  # CPU اجرا
+# لود مدل تحلیل احساسات (مدل فارسی)
+sentiment_pipeline = pipeline("sentiment-analysis", model="HooshvareLab/bert-fa-base-uncased")
+
+# چت‌بات ساده برای جواب دادن به سوالات متداول
+faq = {
+    "سفارش من کجاست؟": "سفارش شما در حال پردازش است.",
+    "چطور رمز عبورم را تغییر دهم؟": "برای تغییر رمز عبور، به بخش تنظیمات حساب کاربری بروید.",
+    "سلام": "سلام! چطور می‌توانم به شما کمک کنم؟",
+    "خوبی": "بله، ممنون! چطور می‌توانم به شما کمک کنم؟"
+}
 
 @app.route("/")
-def index():
-    return render_template("index.html")
+def home():
+    """صفحه اصلی که پیام خوش‌آمدگویی نمایش می‌دهد"""
+    return render_template('index.html')  # استفاده از render_template برای بارگذاری فایل HTML از پوشه templates
 
 @app.route("/chat", methods=["POST"])
 def chat():
+    """مسیر چت که پیام کاربر را می‌گیرد و پاسخ می‌دهد"""
     data = request.json
     user_message = data.get("message", "")
 
-    prompt = f"کاربر: {user_message}\nبات:"
-    output = generator(
-        prompt,
-        max_length=100,
-        num_return_sequences=1,
-        pad_token_id=tokenizer.eos_token_id,
-        do_sample=True,
-        top_k=40,
-        top_p=0.9,
-        temperature=0.9,
-    )
-
-    generated_text = output[0]['generated_text']
-    answer = generated_text.split("بات:")[-1].strip().split("\n")[0]
-
+    # تحلیل احساسات
+    sentiment = sentiment_pipeline(user_message)[0]
+    sentiment_label = "مثبت" if sentiment["label"] == "LABEL_1" else "منفی"
+    
+    # پیدا کردن پاسخ به سوالات متداول
+    response = faq.get(user_message, "متاسفانه نمی‌توانم به این سوال پاسخ دهم.")
+    
     return jsonify({
-        "response": answer
+        "response": response,
+        "sentiment": sentiment_label,
+        "score": sentiment["score"]
     })
 
 def open_browser():
-    webbrowser.open("http://127.0.0.1:5000")
+    """این تابع برای باز کردن مرورگر به طور خودکار استفاده می‌شود."""
+    webbrowser.open("http://127.0.0.1:5000", new=2)  # new=2 برای باز کردن در یک تب جدید
 
 if __name__ == "__main__":
-    threading.Timer(1.5, open_browser).start()
-    app.run(debug=True)
+    # برای اینکه مرورگر خودکار باز شود، سرور را در یک نخ جداگانه اجرا می‌کنیم
+    threading.Timer(1, open_browser).start()  # باز کردن مرورگر 1 ثانیه پس از شروع سرور
+    app.run(debug=True, port=5000)
