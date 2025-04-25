@@ -1,52 +1,43 @@
 from flask import Flask, request, jsonify, render_template
-from transformers import pipeline
+from transformers import AutoTokenizer, AutoModelWithLMHead, pipeline
 from flask_cors import CORS
+import torch
 import webbrowser
 import threading
 
-app = Flask(__name__)  # از Flask بدون نیاز به static_folder استفاده می‌کنیم
-CORS(app)  # برای دسترسی به API از مرورگرهای مختلف
+app = Flask(__name__)
+CORS(app)
 
-# لود مدل تحلیل احساسات (مدل فارسی)
-sentiment_pipeline = pipeline("sentiment-analysis", model="HooshvareLab/bert-fa-base-uncased")
+# مدل GPT2 فارسی
+tokenizer = AutoTokenizer.from_pretrained("HooshvareLab/gpt2-fa")
+model = AutoModelWithLMHead.from_pretrained("HooshvareLab/gpt2-fa")
 
-# چت‌بات ساده برای جواب دادن به سوالات متداول
-faq = {
-    "سفارش من کجاست؟": "سفارش شما در حال پردازش است.",
-    "چطور رمز عبورم را تغییر دهم؟": "برای تغییر رمز عبور، به بخش تنظیمات حساب کاربری بروید.",
-    "سلام": "سلام! چطور می‌توانم به شما کمک کنم؟",
-    "خوبی": "بله، ممنون! چطور می‌توانم به شما کمک کنم؟"
-}
+# لود کردن pipeline تولید متن
+generator = pipeline("text-generation", model=model, tokenizer=tokenizer, device=0 if torch.cuda.is_available() else -1)
 
 @app.route("/")
-def home():
-    """صفحه اصلی که پیام خوش‌آمدگویی نمایش می‌دهد"""
-    return render_template('index.html')  # استفاده از render_template برای بارگذاری فایل HTML از پوشه templates
+def index():
+    return render_template("index.html")
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    """مسیر چت که پیام کاربر را می‌گیرد و پاسخ می‌دهد"""
     data = request.json
     user_message = data.get("message", "")
 
-    # تحلیل احساسات
-    sentiment = sentiment_pipeline(user_message)[0]
-    sentiment_label = "مثبت" if sentiment["label"] == "LABEL_1" else "منفی"
-    
-    # پیدا کردن پاسخ به سوالات متداول
-    response = faq.get(user_message, "متاسفانه نمی‌توانم به این سوال پاسخ دهم.")
-    
+    # تولید پاسخ با GPT2
+    prompt = f"کاربر: {user_message}\nبات:"
+    response = generator(prompt, max_length=100, num_return_sequences=1, pad_token_id=tokenizer.eos_token_id)[0]['generated_text']
+
+    # استخراج فقط جمله بعد از "بات:"
+    answer = response.split("بات:")[-1].strip().split("\n")[0]
+
     return jsonify({
-        "response": response,
-        "sentiment": sentiment_label,
-        "score": sentiment["score"]
+        "response": answer
     })
 
 def open_browser():
-    """این تابع برای باز کردن مرورگر به طور خودکار استفاده می‌شود."""
-    webbrowser.open("http://127.0.0.1:5000", new=2)  # new=2 برای باز کردن در یک تب جدید
+    webbrowser.open("http://127.0.0.1:5000")
 
 if __name__ == "__main__":
-    # برای اینکه مرورگر خودکار باز شود، سرور را در یک نخ جداگانه اجرا می‌کنیم
-    threading.Timer(1, open_browser).start()  # باز کردن مرورگر 1 ثانیه پس از شروع سرور
-    app.run(debug=True, port=5000)
+    threading.Timer(1.5, open_browser).start()
+    app.run(debug=True)
