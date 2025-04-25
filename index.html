@@ -92,6 +92,8 @@
             border-radius: 10px;
             max-width: 75%;
             margin-left: 10px;
+            white-space: nowrap;
+            overflow: hidden;
         }
 
         .input-container {
@@ -135,11 +137,6 @@
             transform: scale(1.05);
         }
 
-        /* حذف بخش اطلاعات مفید */
-        .info-box {
-            display: none;
-        }
-
     </style>
 </head>
 <body>
@@ -176,12 +173,34 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    // فقط نمایش پاسخ چت‌بات (بدون احساسات و امتیاز)
-                    chatBox.innerHTML += `<div class="bot-message"><i class="fas fa-robot"></i> <strong>چت‌بات:</strong> ${data.response}</div>`;
-                    chatBox.scrollTop = chatBox.scrollHeight; // اسکرول خودکار به پایین
+                    // پاسخ چت‌بات با افکت تایپ
+                    displayTypingEffect(data.response);
                     document.getElementById('user-input').value = '';
                 });
             }
+        }
+
+        // نمایش افکت تایپ
+        function displayTypingEffect(message) {
+            const chatBox = document.getElementById('chat-box');
+            const botMessageDiv = document.createElement('div');
+            botMessageDiv.classList.add('bot-message');
+            chatBox.appendChild(botMessageDiv);
+            
+            let i = 0;
+            const typingSpeed = 100; // سرعت تایپ (میلی‌ثانیه)
+            
+            function type() {
+                if (i < message.length) {
+                    botMessageDiv.innerHTML += message.charAt(i);
+                    i++;
+                    setTimeout(type, typingSpeed); // تایپ تدریجی حرف‌ها
+                } else {
+                    chatBox.scrollTop = chatBox.scrollHeight; // اسکرول به پایین بعد از تمام شدن تایپ
+                }
+            }
+            
+            type(); // شروع تایپ
         }
 
         // ارسال پیام با فشردن Enter
@@ -194,7 +213,7 @@
         // پیام خوش‌آمدگویی چت‌بات
         window.onload = function() {
             const chatBox = document.getElementById('chat-box');
-            chatBox.innerHTML += `<div class="bot-message"><i class="fas fa-robot"></i> <strong>چت‌بات:</strong> سلام! چطور می‌توانم به شما کمک کنم؟</div>`;
+            displayTypingEffect('سلام! چطور می‌توانم به شما کمک کنم؟');
         };
     </script>
 
