@@ -1,10 +1,11 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from transformers import pipeline
 from flask_cors import CORS
 import webbrowser
 import threading
+import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')  # تعریف فولدر static برای فایل‌های استاتیک مثل HTML
 CORS(app)  # برای دسترسی به API از مرورگرهای مختلف
 
 # لود مدل تحلیل احساسات (مدل فارسی)
@@ -18,8 +19,14 @@ faq = {
     "خوبی": "بله، ممنون! چطور می‌توانم به شما کمک کنم؟"
 }
 
+@app.route("/")
+def home():
+    """صفحه اصلی که پیام خوش‌آمدگویی نمایش می‌دهد"""
+    return send_from_directory(os.path.join(app.root_path, 'static'), 'index.html')
+
 @app.route("/chat", methods=["POST"])
 def chat():
+    """مسیر چت که پیام کاربر را می‌گیرد و پاسخ می‌دهد"""
     data = request.json
     user_message = data.get("message", "")
 
@@ -43,4 +50,4 @@ def open_browser():
 if __name__ == "__main__":
     # برای اینکه مرورگر خودکار باز شود، سرور را در یک نخ جداگانه اجرا می‌کنیم
     threading.Timer(1, open_browser).start()  # باز کردن مرورگر 1 ثانیه پس از شروع سرور
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
