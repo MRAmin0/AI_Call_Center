@@ -1,58 +1,46 @@
 from flask import Flask, request, jsonify
-from transformers import pipeline, BertTokenizerFast, BertForSequenceClassification
+from transformers import pipeline
 from flask_cors import CORS
-import logging
+import webbrowser
+import threading
 
-# راه اندازی برنامه Flask
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # برای دسترسی به API از مرورگرهای مختلف
 
-# تنظیمات مدل تحلیل احساسات
+# لود مدل تحلیل احساسات (مدل فارسی)
 sentiment_pipeline = pipeline("sentiment-analysis", model="HooshvareLab/bert-fa-base-uncased")
 
-# چت‌بات ساده برای سوالات متداول
+# چت‌بات ساده برای جواب دادن به سوالات متداول
 faq = {
     "سفارش من کجاست؟": "سفارش شما در حال پردازش است.",
     "چطور رمز عبورم را تغییر دهم؟": "برای تغییر رمز عبور، به بخش تنظیمات حساب کاربری بروید.",
     "سلام": "سلام! چطور می‌توانم به شما کمک کنم؟",
-    "خوبی": "بله، ممنون! چطور می‌توانم به شما کمک کنم؟",
-    "مرسی": "خواهش میکنم، اگر کار دیگری داشتید درخدمتم!"
-
+    "خوبی": "بله، ممنون! چطور می‌توانم به شما کمک کنم؟"
 }
 
-# تنظیمات لاگ برای نمایش خطاها
-logging.basicConfig(level=logging.INFO)
-
-# تابع چت برای پاسخ‌دهی به کاربران
 @app.route("/chat", methods=["POST"])
 def chat():
-    try:
-        data = request.json
-        user_message = data.get("message", "")
+    data = request.json
+    user_message = data.get("message", "")
 
-        # بررسی وجود پیام
-        if not user_message:
-            return jsonify({"error": "پیام ارسالی نمی‌تواند خالی باشد!"}), 400
-
-        # تحلیل احساسات
-        sentiment = sentiment_pipeline(user_message)[0]
-        sentiment_label = "مثبت" if sentiment["label"] == "LABEL_1" else ("منفی" if sentiment["label"] == "LABEL_0" else "خنثی")
-        
-        # جستجو در سوالات متداول
-        response = faq.get(user_message, "متاسفانه نمی‌توانم به این سوال پاسخ دهم.")
-        
-        # برگشت پاسخ و احساسات
-        return jsonify({
-            "response": response,
-            "sentiment": sentiment_label,
-            "score": sentiment["score"]
-        })
+    # تحلیل احساسات
+    sentiment = sentiment_pipeline(user_message)[0]
+    sentiment_label = "مثبت" if sentiment["label"] == "LABEL_1" else "منفی"
     
-    except Exception as e:
-        logging.error(f"Error occurred: {e}")
-        return jsonify({"error": "خطای داخلی سرور رخ داده است!"}), 500
+    # پیدا کردن پاسخ به سوالات متداول
+    response = faq.get(user_message, "متاسفانه نمی‌توانم به این سوال پاسخ دهم.")
+    
+    return jsonify({
+        "response": response,
+        "sentiment": sentiment_label,
+        "score": sentiment["score"]
+    })
 
+def open_browser():
+    """این تابع برای باز کردن مرورگر به طور خودکار استفاده می‌شود."""
+    webbrowser.open("http://127.0.0.1:5000", new=2)  # new=2 برای باز کردن در یک تب جدید
 
-# اجرا در صورت اجرا در محیط تولید
 if __name__ == "__main__":
+    # برای اینکه مرورگر خودکار باز شود، سرور را در یک نخ جداگانه اجرا می‌کنیم
+    threading.Timer(1, open_browser).start()  # باز کردن مرورگر 1 ثانیه پس از شروع سرور
     app.run(debug=True)
